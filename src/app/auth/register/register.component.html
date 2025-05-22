@@ -1,0 +1,29 @@
+<div class="register-container">
+  <h2>Registro de Usuario</h2>
+  <form (ngSubmit)="onSubmit()" #registerForm="ngForm">
+    <input type="text" placeholder="Nombre" [(ngModel)]="formData.nombre" name="nombre" required />
+    <input type="text" placeholder="Apellido" [(ngModel)]="formData.apellido" name="apellido" required />
+    <input type="email" placeholder="Correo electrónico" [(ngModel)]="formData.correo" name="correo" required />
+    <input type="tel" placeholder="Teléfono" [(ngModel)]="formData.telefono" name="telefono" required />
+    <input type="text" placeholder="Dirección" [(ngModel)]="formData.direccion" name="direccion" required />
+    <input type="password" placeholder="Contraseña" [(ngModel)]="formData.password" name="password" required />
+    
+    <label for="rol">Selecciona tu rol:</label>
+    <select [(ngModel)]="formData.rol" name="rol" required>
+      <option value="">-- Selecciona un rol --</option>
+      <option value="cliente">Cliente</option>
+      <option value="paseador">Paseador</option>
+    </select>
+
+    <!-- Campos adicionales para paseadores -->
+    <div *ngIf="formData.rol === 'paseador'">
+      <input type="text" placeholder="Zona de servicio" [(ngModel)]="formData.zona_servicio" name="zona_servicio" required />
+      <input type="text" placeholder="Disponibilidad" [(ngModel)]="formData.disponibilidad" name="disponibilidad" required />
+      <input type="number" placeholder="Tarifa" [(ngModel)]="formData.tarifa" name="tarifa" required />
+    </div>
+
+    <button type="submit" [disabled]="!registerForm.form.valid">Registrarse</button>
+  </form>
+
+  <p *ngIf="mensajeError" style="color: red;">{{ mensajeError }}</p>
+</div>

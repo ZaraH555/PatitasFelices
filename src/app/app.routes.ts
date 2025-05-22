@@ -1,7 +1,20 @@
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'mascotas', pathMatch: 'full' },
+  // Ruta por defecto redirige a login
+  { path: '', redirectTo: 'login', pathMatch: 'full' },
+
+  // Login y Registro (standalone)
+  {
+    path: 'login',
+    loadComponent: () => import('./auth/login/login.component').then(m => m.LoginComponent)
+  },
+  {
+    path: 'registro',
+    loadComponent: () => import('./auth/register/register.component').then(m => m.RegisterComponent)
+  },
+
+  // Rutas principales
   { 
     path: 'mascotas', 
     loadComponent: () => import('./components/mascotas/mascotas.component').then(m => m.MascotasComponent)
@@ -22,5 +35,9 @@ export const routes: Routes = [
     path: 'paseos/confirmacion', 
     redirectTo: 'confirmacion', 
     pathMatch: 'full' 
-  }
+  },
+
+  // Ruta comodín (por si no existe)
+  { path: '**', redirectTo: 'login' }
 ];
+

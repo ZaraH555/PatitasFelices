@@ -6,8 +6,7 @@ module.exports = {
     name: 'patitas_felices'
   },
   stripe: {
-    publishableKey: 'pk_test_...', // Add your test publishable key
-    // Secret key should be in .env file only
+    publishableKey: 'pk_test_...', 
   },
   server: {
     port: 3000
