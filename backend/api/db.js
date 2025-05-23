@@ -4,16 +4,15 @@ const connection = mysql.createConnection({
   host: 'localhost',
   user: 'root',
   password: '',
-  database: 'patitas_felices', 
-  charset: 'utf8mb4'
+  database: 'basededatos'
 });
 
 connection.connect((err) => {
   if (err) {
-    console.error('❌ Error al conectar a MySQL:', err.message);
+    console.error('Error connecting to MySQL:', err);
     throw err;
   }
-  console.log('✅ Conectado a la base de datos MySQL');
+  console.log('Connected to MySQL database');
 });
 
 module.exports = connection;
