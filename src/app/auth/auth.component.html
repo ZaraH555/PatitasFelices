@@ -1,5 +1,5 @@
 <div class="auth-container" [ngClass]="{'recovery-mode': currentForm === 'recovery'}">
-  <!-- Login -->
+  
   <div *ngIf="currentForm === 'login'">
     <h2>Iniciar Sesión</h2>
     <div *ngIf="error" class="error-message">{{error}}</div>
@@ -26,7 +26,6 @@
     </div>
   </div>
 
-  <!-- Registro -->
   <div *ngIf="currentForm === 'register'">
     <h2>Registro de Usuario</h2>
     <div *ngIf="error" class="error-message">{{error}}</div>
@@ -78,7 +77,6 @@
     </p>
   </div>
 
-  <!-- Recuperación -->
   <div *ngIf="currentForm === 'recovery'" class="recovery-form">
     <h2>Recuperar Contraseña</h2>
     <form (ngSubmit)="onFormSubmit('recovery')" [formGroup]="recoveryForm">

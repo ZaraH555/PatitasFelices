@@ -1,17 +1,34 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
+import { RoleGuard } from './guards/role.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'mascotas', pathMatch: 'full' },
+  { path: '', redirectTo: 'auth', pathMatch: 'full' },
   { 
     path: 'auth', 
     loadChildren: () => import('./auth/auth.routes')
       .then(m => m.authRoutes)
   },
-  { 
-    path: 'mascotas', 
-    loadComponent: () => import('./components/mascotas/mascotas.component').then(m => m.MascotasComponent),
-    canActivate: [AuthGuard]
+  {
+    path: 'admin',
+    loadComponent: () => import('./components/admin-dashboard/admin-dashboard.component')
+      .then(m => m.AdminDashboardComponent),
+    canActivate: [AuthGuard, RoleGuard],
+    data: { role: 'administrador' }
+  },
+  {
+    path: 'paseador',
+    loadComponent: () => import('./components/paseador-dashboard/paseador-dashboard.component')
+      .then(m => m.PaseadorDashboardComponent),
+    canActivate: [AuthGuard, RoleGuard],
+    data: { role: 'paseador' }
+  },
+  {
+    path: 'mascotas',
+    loadComponent: () => import('./components/mascotas/mascotas.component')
+      .then(m => m.MascotasComponent),
+    canActivate: [AuthGuard],
+    data: { role: 'dueño' }
   },
   { 
     path: 'paseos', 
@@ -39,9 +56,5 @@ export const routes: Routes = [
     path: 'unauthorized',
     loadComponent: () => import('./components/unauthorized/unauthorized.component')
       .then(m => m.UnauthorizedComponent)
-  },
-  {
-    path: '**',
-    redirectTo: ''
   }
 ];

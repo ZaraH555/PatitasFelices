@@ -107,7 +107,6 @@ export class AuthComponent {
     this.currentForm = form;
     this.error = '';
 
-    // Reset forms when switching
     if (form === 'login') {
       this.loginForm.reset();
     } else if (form === 'register') {

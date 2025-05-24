@@ -22,10 +22,26 @@ interface CarritoItem {
       <nav class="sidebar" *ngIf="authService.user$ | async as user">
         <h3>Patitas Felices</h3>
         <ul class="nav-menu">
-          <li><a routerLink="/mascotas" routerLinkActive="active">Mis Mascotas</a></li>
-          <li><a routerLink="/paseos" routerLinkActive="active">Solicitar Paseo</a></li>
+          <!-- Show only for dueños -->
+          <li *ngIf="user.rol === 'dueño'">
+            <a routerLink="/mascotas" routerLinkActive="active">Mis Mascotas</a>
+          </li>
+          <li *ngIf="user.rol === 'dueño'">
+            <a routerLink="/paseos" routerLinkActive="active">Solicitar Paseo</a>
+          </li>
+          
+          <!-- Show only for paseadores -->
+          <li *ngIf="user.rol === 'paseador'">
+            <a routerLink="/paseador" routerLinkActive="active">Mis Paseos</a>
+          </li>
+          
+          <!-- Show only for admins -->
+          <li *ngIf="user.rol === 'administrador'">
+            <a routerLink="/admin" routerLinkActive="active">Administración</a>
+          </li>
+          
+          <!-- Common for all -->
           <li><a routerLink="/facturas" routerLinkActive="active">Facturación</a></li>
-          <li *ngIf="user.rol === 'admin'"><a routerLink="/admin" routerLinkActive="active">Administración</a></li>
           <li><a (click)="logout()" class="logout-link">Cerrar Sesión</a></li>
         </ul>
       </nav>

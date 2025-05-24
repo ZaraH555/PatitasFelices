@@ -713,20 +713,33 @@ app.post('/api/sample-paseos', async (req, res) => {
 });
 
 // Authentication routes
-// Add rate limiting middleware
+// Configure rate limiter
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
-  message: 'Demasiados intentos, por favor intente más tarde'
+  max: 100, // Increase limit to 100 requests per windowMs
+  message: { message: 'Demasiados intentos, por favor intente más tarde' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      message: 'Demasiados intentos, por favor intente más tarde',
+      remainingTime: Math.ceil(req.rateLimit.resetTime / 1000)
+    });
+  }
 });
 
-// Apply rate limiting to auth routes
-app.use('/api/auth', authLimiter);
+// Apply rate limiting to specific auth routes only
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/recuperar', authLimiter);
 
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { correo, contrasena } = req.body;
     
+    if (!correo || !contrasena) {
+      return res.status(400).json({ message: 'Correo y contraseña son requeridos' });
+    }
+
     const [users] = await connection.promise().query(
       'SELECT id, nombre, apellido, correo, rol FROM usuarios WHERE correo = ? AND contraseña = ?',
       [correo, contrasena]

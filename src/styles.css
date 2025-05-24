@@ -50,7 +50,6 @@ body {
     padding: 20px;
 }
 
-/* Cards */
 .card {
     background: white;
     border-radius: var(--border-radius);
@@ -71,7 +70,6 @@ body {
     font-weight: 600;
 }
 
-/* Buttons */
 .btn {
     padding: 8px 16px;
     border-radius: var(--border-radius);
@@ -102,7 +100,6 @@ body {
     color: white;
 }
 
-/* Forms */
 .form-group {
     margin-bottom: 1rem;
 }
@@ -114,7 +111,6 @@ body {
     border-radius: var(--border-radius);
 }
 
-/* Responsive */
 @media (max-width: 768px) {
     .dashboard {
         flex-direction: column;

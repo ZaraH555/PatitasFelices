@@ -5,6 +5,7 @@ import { catchError, tap } from 'rxjs/operators';
 import { Usuario } from '../models/usuario.model';
 import { environment } from '../../environments/environment';
 import { isPlatformBrowser } from '@angular/common';
+import { Router } from '@angular/router';
 
 interface AuthResponse {
   usuario: Usuario;
@@ -17,6 +18,7 @@ export class AuthService {
   public user$ = this.userSubject.asObservable();
   private platformId = inject(PLATFORM_ID);
   private http = inject(HttpClient);
+  private router = inject(Router);
   private apiUrl = `${environment.apiUrl}/auth`;
 
   constructor() {
@@ -68,13 +70,27 @@ export class AuthService {
   //   }
   // }
 
-  login(correo: string, contrasena: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, { correo, contrasena })
+  login(correo: string, contrasena: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/login`, { correo, contrasena })
       .pipe(
         tap(response => {
           localStorage.setItem('token', response.token);
           localStorage.setItem('user', JSON.stringify(response.usuario));
           this.userSubject.next(response.usuario);
+          
+          switch (response.usuario.rol) {
+            case 'administrador':
+              this.router.navigate(['/admin']);
+              break;
+            case 'paseador':
+              this.router.navigate(['/paseador']);
+              break;
+            case 'dueño':
+              this.router.navigate(['/mascotas']);
+              break;
+            default:
+              this.router.navigate(['/mascotas']);
+          }
         }),
         catchError(this.handleError.bind(this))
       );
@@ -92,6 +108,15 @@ export class AuthService {
   //       catchError(this.handleError)
   //     );
   // }
+  
+
+  getDashboardRoute(rol: string): string {
+    switch (rol) {
+      case 'administrador': return '/admin';
+      case 'paseador': return '/paseador';
+      default: return '/dashboard';
+    }
+  }
 
   logout(): void {
     if (isPlatformBrowser(this.platformId)) {
@@ -112,7 +137,6 @@ export class AuthService {
   registrar(usuario: Partial<Usuario>): Observable<Usuario> {
     return this.http.post<Usuario>(`${this.apiUrl}/registro`, usuario).pipe(
       tap(user => {
-        // Don't automatically log in after registration
         console.log('Usuario registrado:', user);
       }),
       catchError(this.handleError.bind(this))
