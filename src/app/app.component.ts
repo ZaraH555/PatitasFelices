@@ -1,6 +1,6 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { FormsModule, NgForm } from '@angular/forms';
 import { PaseosService } from './services/paseos.service';
 import { Mascota } from './models/mascota';
@@ -8,6 +8,7 @@ import { Servicio } from './models/servicio';
 import { Paseo } from './models/paseo';
 import { catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
+import { AuthService } from './services/auth.service';
 
 interface CarritoItem {
   servicio: Servicio;
@@ -18,12 +19,14 @@ interface CarritoItem {
   selector: 'app-root',
   template: `
     <div class="app-container">
-      <nav class="sidebar">
+      <nav class="sidebar" *ngIf="authService.user$ | async as user">
         <h3>Patitas Felices</h3>
         <ul class="nav-menu">
           <li><a routerLink="/mascotas" routerLinkActive="active">Mis Mascotas</a></li>
           <li><a routerLink="/paseos" routerLinkActive="active">Solicitar Paseo</a></li>
           <li><a routerLink="/facturas" routerLinkActive="active">Facturación</a></li>
+          <li *ngIf="user.rol === 'admin'"><a routerLink="/admin" routerLinkActive="active">Administración</a></li>
+          <li><a (click)="logout()" class="logout-link">Cerrar Sesión</a></li>
         </ul>
       </nav>
       <main class="main-content">
@@ -91,7 +94,7 @@ export class AppComponent implements OnInit {
   };
   selectedMascotaId: number | null = null;
 
-  constructor(private paseosService: PaseosService) {}
+  constructor(private paseosService: PaseosService, public authService: AuthService, private router: Router) {}
 
   ngOnInit() {
     this.loadData();
@@ -279,5 +282,10 @@ export class AppComponent implements OnInit {
         }
       }
     });
+  }
+
+  logout() {
+    this.authService.logout();
+    this.router.navigate(['/auth']);
   }
 }

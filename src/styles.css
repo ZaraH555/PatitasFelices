@@ -10,6 +10,8 @@
     --tertiary-color: #FF9800;
     --card-shadow: 0 4px 8px rgba(0,0,0,0.1);
     --border-radius: 8px;
+    --border-color: #dee2e6;
+    --disabled-color: #6c757d;
 }
 
 * {

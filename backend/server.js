@@ -5,17 +5,43 @@ const mysql = require('mysql2');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const jwt = require('jsonwebtoken');
+const authConfig = require('./config/auth.config');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const bcrypt = require('bcrypt');
+const rateLimit = require('express-rate-limit');
+const validator = require('validator');
+const { sendPasswordRecoveryEmail, sendRecoveryEmail } = require('./utils/emailService');
 
 const app = express();
 
-// Middleware
-app.use(cors({
+// Update CORS configuration
+const corsOptions = {
   origin: 'http://localhost:4200',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
+// Add headers middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:4200');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
+// Body parsing middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Update base path for uploads
 const UPLOADS_BASE_PATH = path.join(__dirname, '..', 'uploads');
@@ -139,28 +165,47 @@ function initializeDatabase() {
               return;
             }
 
-            // Add test services if none exist
-            connection.query('SELECT COUNT(*) as count FROM servicios', (error, results) => {
-              if (!error && results[0].count === 0) {
-                const testServices = [
-                  {
-                    nombre: 'Paseo Básico',
-                    duracion: 30,
-                    precio: 150.00,
-                    descripcion: 'Paseo de 30 minutos'
-                  },
-                  {
-                    nombre: 'Paseo Estándar',
-                    duracion: 60,
-                    precio: 250.00,
-                    descripcion: 'Paseo de 1 hora'
-                  }
-                ];
-                
-                testServices.forEach(service => {
-                  connection.query('INSERT INTO servicios SET ?', service);
-                });
+            // Create usuarios table if not exists
+            connection.query(`
+              CREATE TABLE IF NOT EXISTS usuarios (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                nombre VARCHAR(100) NOT NULL,
+                apellido VARCHAR(100) NOT NULL,
+                correo VARCHAR(100) NOT NULL UNIQUE,
+                telefono VARCHAR(20),
+                direccion VARCHAR(200),
+                contraseña VARCHAR(255) NOT NULL,
+                rol VARCHAR(20) NOT NULL
+              ) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci
+            `, (error) => {
+              if (error) {
+                console.error('Error creating usuarios table:', error);
+                return;
               }
+
+              // Add test services if none exist
+              connection.query('SELECT COUNT(*) as count FROM servicios', (error, results) => {
+                if (!error && results[0].count === 0) {
+                  const testServices = [
+                    {
+                      nombre: 'Paseo Básico',
+                      duracion: 30,
+                      precio: 150.00,
+                      descripcion: 'Paseo de 30 minutos'
+                    },
+                    {
+                      nombre: 'Paseo Estándar',
+                      duracion: 60,
+                      precio: 250.00,
+                      descripcion: 'Paseo de 1 hora'
+                    }
+                  ];
+                  
+                  testServices.forEach(service => {
+                    connection.query('INSERT INTO servicios SET ?', service);
+                  });
+                }
+              });
             });
           });
         });
@@ -667,7 +712,166 @@ app.post('/api/sample-paseos', async (req, res) => {
   }
 });
 
-const PORT = 3000;
+// Authentication routes
+// Add rate limiting middleware
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 requests per windowMs
+  message: 'Demasiados intentos, por favor intente más tarde'
+});
+
+// Apply rate limiting to auth routes
+app.use('/api/auth', authLimiter);
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { correo, contrasena } = req.body;
+    
+    const [users] = await connection.promise().query(
+      'SELECT id, nombre, apellido, correo, rol FROM usuarios WHERE correo = ? AND contraseña = ?',
+      [correo, contrasena]
+    );
+
+    if (users.length === 0) {
+      return res.status(401).json({ message: 'Credenciales inválidas' });
+    }
+
+    const token = jwt.sign(
+      { id: users[0].id, rol: users[0].rol },
+      authConfig.secret,
+      { expiresIn: authConfig.jwtExpiration }
+    );
+
+    res.json({ 
+      usuario: users[0],
+      token: token
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Error en el servidor' });
+  }
+});
+
+app.post('/api/auth/registro', async (req, res) => {
+  try {
+    const { nombre, apellido, correo, telefono, direccion, contrasena, rol } = req.body;
+
+    // Validate input
+    if (!validator.isEmail(correo)) {
+      return res.status(400).json({ message: 'Correo electrónico inválido' });
+    }
+    if (!validator.isLength(contrasena, { min: 8 })) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres' });
+    }
+
+    const [existingUsers] = await connection.promise().query(
+      'SELECT id FROM usuarios WHERE correo = ?',
+      [correo]
+    );
+
+    if (existingUsers.length > 0) {
+      return res.status(400).json({ message: 'El correo ya está registrado' });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(contrasena, 10);
+
+    const [result] = await connection.promise().query(
+      `INSERT INTO usuarios (nombre, apellido, correo, telefono, direccion, contraseña, rol) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [nombre, apellido, correo, telefono, direccion, hashedPassword, rol]
+    );
+
+    if (rol === 'paseador') {
+      await connection.promise().query(
+        'INSERT INTO paseadores (usuario_id, zona_servicio, tarifa) VALUES (?, ?, ?)',
+        [result.insertId, 'Zona 1', 100]
+      );
+    }
+    res.status(201).json({
+      id: result.insertId,
+      nombre,
+      apellido,
+      correo,
+      rol
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Error en el servidor' });
+  }
+});
+
+app.post('/api/auth/recuperar', async (req, res) => {
+  try {
+    const { correo } = req.body;
+    
+    const [users] = await connection.promise().query(
+      'SELECT id FROM usuarios WHERE correo = ?',
+      [correo]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    const token = jwt.sign(
+      { id: users[0].id, purpose: 'password-reset' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    await connection.promise().query(
+      'UPDATE usuarios SET token_recuperacion = ? WHERE id = ?',
+      [token, users[0].id]
+    );
+
+    const emailSent = await sendRecoveryEmail(correo, token);
+
+    if (!emailSent) {
+      return res.status(500).json({ message: 'Error al enviar el correo' });
+    }
+
+    res.json({ message: 'Se ha enviado un enlace de recuperación a tu correo' });
+  } catch (error) {
+    console.error('Recovery error:', error);
+    res.status(500).json({ message: 'Error al procesar la solicitud' });
+  }
+});
+
+app.post('/api/auth/restablecer', async (req, res) => {
+  try {
+    const { token, nuevaContrasena } = req.body;
+    
+    // Verify token exists
+    if (!token || !nuevaContrasena) {
+      return res.status(400).json({ message: 'Token y nueva contraseña son requeridos' });
+    }
+
+    // Verify token in database
+    const [users] = await connection.promise().query(
+      'SELECT id FROM usuarios WHERE token_recuperacion = ?',
+      [token]
+    );
+
+    if (users.length === 0) {
+      return res.status(400).json({ message: 'Token inválido o expirado' });
+    }
+
+    // Update password and clear recovery token
+    await connection.promise().query(
+      'UPDATE usuarios SET contraseña = ?, token_recuperacion = NULL WHERE id = ?',
+      [nuevaContrasena, users[0].id]
+    );
+
+    res.json({ message: 'Contraseña actualizada correctamente' });
+  } catch (error) {
+    console.error('Password reset error:', error);
+    res.status(500).json({ message: 'Error al restablecer la contraseña' });
+  }
+});
+
+// Add at the end of file
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
