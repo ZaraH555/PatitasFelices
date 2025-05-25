@@ -15,7 +15,6 @@ const { sendPasswordRecoveryEmail, sendRecoveryEmail } = require('./utils/emailS
 
 const app = express();
 
-// Update CORS configuration
 const corsOptions = {
   origin: 'http://localhost:4200',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -26,7 +25,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Add headers middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', 'http://localhost:4200');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -39,14 +37,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Update base path for uploads
 const UPLOADS_BASE_PATH = path.join(__dirname, '..', 'uploads');
 
-// Configure multer for handling file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = path.join(UPLOADS_BASE_PATH, 'mascotas');
@@ -72,14 +67,12 @@ const upload = multer({
   }
 });
 
-// Update static file serving
 app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Content-Type', 'image/*');
   next();
 }, express.static(UPLOADS_BASE_PATH));
 
-// Database connection
 const connection = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -95,26 +88,23 @@ connection.connect(error => {
   }
   console.log('Successfully connected to database');
   
-  // Initialize database tables
   initializeDatabase();
 });
 
 function initializeDatabase() {
-  // First create database if it doesn't exist
+ 
   connection.query(`CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci`, (error) => {
     if (error) {
       console.error('Error creating database:', error);
       return;
     }
 
-    // Select the database
     connection.query(`USE ${process.env.DB_NAME}`, (error) => {
       if (error) {
         console.error('Error selecting database:', error);
         return;
       }
 
-      // Create mascotas table if not exists
       connection.query(`
         CREATE TABLE IF NOT EXISTS mascotas (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -651,11 +641,9 @@ app.get('/api/facturas', (req, res) => {
   });
 });
 
-// Add DELETE endpoint for mascotas
 app.delete('/api/mascotas/:id', (req, res) => {
   const { id } = req.params;
   
-  // First delete associated file if exists
   connection.query('SELECT imagen FROM mascotas WHERE id = ?', [id], (err, results) => {
     if (results?.[0]?.imagen) {
       const filePath = path.join(__dirname, results[0].imagen);
@@ -664,7 +652,6 @@ app.delete('/api/mascotas/:id', (req, res) => {
       }
     }
 
-    // Then delete from database
     connection.query('DELETE FROM mascotas WHERE id = ?', [id], (error) => {
       if (error) {
         console.error('Error deleting mascota:', error);
@@ -712,11 +699,9 @@ app.post('/api/sample-paseos', async (req, res) => {
   }
 });
 
-// Authentication routes
-// Configure rate limiter
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Increase limit to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000, 
+  max: 100, 
   message: { message: 'Demasiados intentos, por favor intente más tarde' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -728,7 +713,6 @@ const authLimiter = rateLimit({
   }
 });
 
-// Apply rate limiting to specific auth routes only
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/recuperar', authLimiter);
 
@@ -769,7 +753,6 @@ app.post('/api/auth/registro', async (req, res) => {
   try {
     const { nombre, apellido, correo, telefono, direccion, contrasena, rol } = req.body;
 
-    // Validate input
     if (!validator.isEmail(correo)) {
       return res.status(400).json({ message: 'Correo electrónico inválido' });
     }
@@ -786,7 +769,6 @@ app.post('/api/auth/registro', async (req, res) => {
       return res.status(400).json({ message: 'El correo ya está registrado' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(contrasena, 10);
 
     const [result] = await connection.promise().query(
@@ -855,12 +837,10 @@ app.post('/api/auth/restablecer', async (req, res) => {
   try {
     const { token, nuevaContrasena } = req.body;
     
-    // Verify token exists
     if (!token || !nuevaContrasena) {
       return res.status(400).json({ message: 'Token y nueva contraseña son requeridos' });
     }
 
-    // Verify token in database
     const [users] = await connection.promise().query(
       'SELECT id FROM usuarios WHERE token_recuperacion = ?',
       [token]
@@ -870,7 +850,6 @@ app.post('/api/auth/restablecer', async (req, res) => {
       return res.status(400).json({ message: 'Token inválido o expirado' });
     }
 
-    // Update password and clear recovery token
     await connection.promise().query(
       'UPDATE usuarios SET contraseña = ?, token_recuperacion = NULL WHERE id = ?',
       [nuevaContrasena, users[0].id]
@@ -883,7 +862,6 @@ app.post('/api/auth/restablecer', async (req, res) => {
   }
 });
 
-// Add at the end of file
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
